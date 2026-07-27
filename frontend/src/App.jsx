@@ -1,78 +1,274 @@
 import React, { useState, useEffect } from 'react';
 
-export default function App() {
-  const [username, setUsername] = useState('');
-  const [text, setText] = useState('');
-  const [messages, setMessages] = useState([]);
+// 💡 バックエンドサーバーのURL（ポート番号等は環境に合わせて変更してください）
+const API_BASE_URL = 'http://localhost:3000';
 
-  const getMessages = async () => {
+function Button({ onClick, children, disabled }) {
+  return (
+    <button
+      onClick={disabled ? undefined : onClick} // disabled時はクリックできないようにガード
+      disabled={disabled}
+      style={{
+        backgroundColor: disabled ? '#333' : '#444',
+        color: disabled ? '#666' : '#ccc',
+        border: '1px solid #666',
+        padding: '4px 12px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        borderRadius: '3px',
+        fontSize: '0.9em'
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function App() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginMessage, setLoginMessage] = useState('');
+  const [symptom, setSymptom] = useState('');
+  const [replyMessage, setReplyMessage] = useState('');
+  const [isAgreed, setIsAgreed] = useState(false);
+
+  // 📝 課題完了の条件：初回表示で自分のDBからデータを自動取得する
+  useEffect(() => {
+    fetchLatestReply();
+  }, []);
+
+  // 3. 返答内容の取得処理 (GET /api/replies)
+  const fetchLatestReply = async () => {
     try {
-      const response = await fetch('api/messages');
+      const response = await fetch(`${API_BASE_URL}/api/replies`);
+      if (!response.ok) throw new Error('データの取得に失敗しました');
       const data = await response.json();
-      setMessages(data);
+      
+      // DBから取得した最新のメッセージを画面に表示（リロードしてもここから復元される）
+      if (data && data.message) {
+        setReplyMessage(data.message);
+      }
     } catch (error) {
-      console.error("メッセージ取得エラー:", error);
+      console.error("履歴取得エラー:", error);
     }
   };
 
-  useEffect(() => {
-    getMessages();
-    const interval = setInterval(getMessages, 3000); 
-    return () => clearInterval(interval);
-  }, []);
-
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!username.trim() || !text.trim()) return;
+  // 1. ログイン実行 (POST /api/login)
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      alert("メールアドレスとパスワードを入力してください！");
+      return;
+    }
 
     try {
-      await fetch('api/messages', {
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, text })
+        body: JSON.stringify({ email, password })
       });
-      setText(''); 
-      getMessages(); 
+      const data = await response.json();
+
+      if (response.ok) {
+        setLoginMessage("ログイン成功");
+      } else {
+        setLoginMessage(`ログイン失敗: ${data.error || '認証エラー'}`);
+      }
     } catch (error) {
-      console.error("メッセージ送信エラー:", error);
+      setLoginMessage("通信エラーが発生しました");
     }
+  };
+
+  // 2. 新規診断テスト (POST /api/results)
+  const handleDiagnose = async () => {
+    if (!symptom.trim()) {
+      alert("症状を入力してください！");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symptom })
+      });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error('診断送信に失敗しました');
+
+      // 💡 送信成功後、DBに新しく保存された最新データをすぐに再取得して画面を更新
+      fetchLatestReply();
+      setSymptom(''); // 入力欄をクリア
+    } catch (error) {
+      alert("診断エラーが発生しました");
+    }
+  };
+
+  const containerStyle = {
+    maxWidth: '600px',
+    margin: '0 auto 20px auto',
+    textAlign: 'center',
+    border: '1px solid #555',
+    padding: '30px 20px',
+    borderRadius: '4px',
+    backgroundColor: '#1e1e1e'
+  };
+
+  const titleStyle = {
+    fontSize: '1.1em',
+    fontWeight: 'bold',
+    marginBottom: '20px',
+    color: '#e0e0e0',
+    textAlign: 'left'
+  };
+
+  const inputStyle = {
+    backgroundColor: '#333',
+    border: '1px solid #555',
+    color: 'white',
+    padding: '5px 10px',
+    width: '250px',
+    marginBottom: '15px',
+    borderRadius: '3px'
   };
 
   return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: '480px', margin: '40px auto', background: '#f0f4f8', padding: '16px', borderRadius: '8px' }}>
-      <h1 style={{ background: '#0d7377', color: 'white', padding: '12px 20px', borderRadius: '6px', fontSize: '20px', margin: '0 0 12px 0' }}>
-        チャットアプリ (React版)
+    <div
+      style={{
+        padding: '40px 20px',
+        color: 'white',
+        backgroundColor: '#1a1a1a',
+        minHeight: '100vh',
+        fontFamily: 'sans-serif'
+      }}
+    >
+      <h1
+        style={{
+          textAlign: 'center',
+          fontSize: '2.5em',
+          marginBottom: '40px',
+          fontWeight: 'bold',
+          letterSpacing: '2px'
+        }}
+      >
+        AI病気診断アプリ
       </h1>
-      
-      <form onSubmit={sendMessage} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-        <input 
-          type="text" 
-          placeholder="名前" 
-          value={username} 
-          onChange={(e) => setUsername(e.target.value)} 
-          required 
-          style={{ width: '80px', padding: '8px 10px', border: '1px solid #bbb', borderRadius: '4px', fontSize: '15px', color: 'black', backgroundColor: 'white' }}
-        />
-        <input 
-          type="text" 
-          placeholder="メッセージ" 
-          value={text} 
-          onChange={(e) => setText(e.target.value)} 
-          required 
-          style={{ flex: 1, padding: '8px 10px', border: '1px solid #bbb', borderRadius: '4px', fontSize: '15px', color: 'black', backgroundColor: 'white' }}
-        />
-        <button type="submit" style={{ padding: '8px 14px', background: '#0d7377', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          送信
-        </button>
-      </form>
 
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {messages.map((msg, index) => (
-          <li key={index} style={{ background: 'white', color: 'black', padding: '8px 12px', marginBottom: '8px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', textAlign: 'left' }}>
-            <strong>{msg.username}</strong>: {msg.text}
-          </li>
-        ))}
-      </ul>
+      {/* 1. ログインテスト */}
+      <div style={containerStyle}>
+        <div style={titleStyle}>1. ログインテスト (POST /api/login)</div>
+
+        <input
+          type="text"
+          placeholder="メールアドレス"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={inputStyle}
+        />
+        <br />
+
+        <input
+          type="password"
+          placeholder="パスワード"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={inputStyle}
+        />
+        <br />
+
+        <Button onClick={handleLogin}>ログイン実行</Button>
+
+        {loginMessage && (
+          <p
+            style={{
+              fontWeight: 'bold',
+              color: '#00ff66', // 💡 ダークモードで見やすいように明るい緑に変更しました
+              marginTop: '10px',
+              fontSize: '0.95em'
+            }}
+          >
+            {loginMessage}
+          </p>
+        )}
+      </div>
+
+      {/* 2. 新規診断テスト */}
+      <div style={containerStyle}>
+        <div style={titleStyle}>2. 新規診断テスト (POST /api/results)</div>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '5px',
+            alignItems: 'center'
+          }}
+        >
+          <input
+            type="text"
+            placeholder="症状を入力 (例: 熱がある)"
+            value={symptom}
+            onChange={(e) => setSymptom(e.target.value)}
+            style={{
+              ...inputStyle,
+              width: '220px',
+              marginBottom: 0
+            }}
+          />
+
+          <Button onClick={handleDiagnose}>診断する</Button>
+        </div>
+
+        {symptom && (
+          <p style={{ marginTop: '15px', color: '#00ffcc', fontSize: '0.9em' }}>
+            入力中の症状：{symptom}
+          </p>
+        )}
+      </div>
+
+      {/* 3. 返答内容の受け取り */}
+      <div style={containerStyle}>
+        <div style={titleStyle}>3. 返答内容の受け取り (GET /api/replies)</div>
+
+        <div style={{ marginBottom: '20px' }}>
+          {/* 💡 ボタン押下時も実通信の取得処理を走らせる */}
+          <Button onClick={fetchLatestReply}>履歴を更新</Button>
+        </div>
+
+        {replyMessage && (
+          <div>
+            <div
+              style={{
+                backgroundColor: 'white',
+                color: 'black',
+                padding: '15px',
+                borderRadius: '4px',
+                textAlign: 'left',
+                fontSize: '0.95em',
+                marginBottom: '15px'
+              }}
+            >
+              {replyMessage}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '15px', borderTop: '1px solid #444', paddingTop: '15px' }}>
+              <label style={{ fontSize: '0.9em', cursor: 'pointer', color: '#aaa' }}>
+                <input 
+                  type="checkbox" 
+                  checked={isAgreed} 
+                  onChange={(e) => setIsAgreed(e.target.checked)} 
+                  style={{ marginRight: '8px' }}
+                />
+                内容を確認しました（医師の診断の代わりになりません）
+              </label>
+
+              <Button onClick={() => alert("承諾しました")} disabled={!isAgreed}>
+                承諾を送信
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+export default App;

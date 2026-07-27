@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  base: './', 
+  base: './', // 【追加】これでビルド後のファイルパスの先頭の「/」が外れます
+  plugins: [react()],
   server: {
     proxy: {
       '^.*/api': {
