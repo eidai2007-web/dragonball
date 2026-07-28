@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // 💡 バックエンドサーバーのURL（ポート番号等は環境に合わせて変更してください）
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'http://localhost:3016';
 
 function Button({ onClick, children, disabled }) {
   return (
